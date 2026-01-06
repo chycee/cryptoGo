@@ -2,13 +2,14 @@ package infra
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/disintegration/imaging"
 )
 
 // IconDownloader handles downloading and caching coin icons
@@ -46,6 +47,7 @@ func NewIconDownloader() (*IconDownloader, error) {
 
 // DownloadIcon downloads the icon for a symbol if it doesn't exist
 // Returns the local file path on success
+// Images are resized to 24x24 pixels for consistent UI display
 func (d *IconDownloader) DownloadIcon(symbol string) (string, error) {
 	// Security: Sanitize symbol to prevent path traversal
 	safeSymbol := sanitizeSymbol(symbol)
@@ -61,10 +63,7 @@ func (d *IconDownloader) DownloadIcon(symbol string) (string, error) {
 		return filePath, nil // Already exists (Cache Hit)
 	}
 
-	// Construct URL (Using CoinGecko or generic icon source)
-	// Fallback mechanism can be implemented here
-	// For now, using a generic placeholder service or specific crypto icon CDN
-	// Example: https://assets.coincap.io/assets/icons/{symbol}@2x.png
+	// Construct URL (Using CoinCap CDN)
 	url := fmt.Sprintf("https://assets.coincap.io/assets/icons/%s@2x.png", strings.ToLower(symbol))
 
 	resp, err := d.client.Get(url)
@@ -77,17 +76,18 @@ func (d *IconDownloader) DownloadIcon(symbol string) (string, error) {
 		return "", fmt.Errorf("bad status: %s", resp.Status)
 	}
 
-	// Create file
-	out, err := os.Create(filePath)
+	// Decode the image
+	srcImg, err := imaging.Decode(resp.Body)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to decode image: %w", err)
 	}
-	defer out.Close()
 
-	// Write content
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return "", err
+	// Resize to 24x24 with high-quality Lanczos filter
+	resizedImg := imaging.Resize(srcImg, 24, 24, imaging.Lanczos)
+
+	// Save the resized image
+	if err := imaging.Save(resizedImg, filePath); err != nil {
+		return "", fmt.Errorf("failed to save resized image: %w", err)
 	}
 
 	return filePath, nil
