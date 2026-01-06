@@ -4,9 +4,9 @@
 
 ## 📋 개요 (Overview)
 
-크립토 고는 **단일 스레드 시퀀서(Sequencer)** 아키텍처를 기반으로 설계되었습니다. 모든 금융 데이터는 정밀도 오류를 방지하기 위해 `int64` (Micros) 단위로 처리되며, 모든 입력은 SQLite WAL에 기록되어 100% 재현 가능합니다.
+**단일 스레드 시퀀서(Sequencer)** 아키텍처 기반으로, 모든 금융 데이터를 `int64` 고정소수점으로 처리하여 정밀도 오류를 방지합니다. 모든 입력은 SQLite WAL에 기록되어 100% 재현 가능합니다.
 
-## 🔄 시스템 워크플로우 (Workflow)
+## 🔄 시스템 아키텍처
 
 ```mermaid
 graph LR
@@ -15,51 +15,66 @@ graph LR
         BG[Bitget WS] --> SEQ
     end
     YH[Yahoo Finance] -."환율 조회".-> UI[UI Layer]
-    SEQ[Sequencer Hotpath] --"1. WAL Log"--> DB[(SQLite WAL)]
-    SEQ --"2. Update State"--> ST[In-Memory State]
-    ST --"Deterministic Replay"--> BT[Backtest Engine]
+    SEQ[Sequencer] --"1. WAL Log"--> DB[(SQLite)]
+    SEQ --"2. State"--> ST[Memory]
+    ST --"Replay"--> BT[Backtest]
 ```
 
-## ⚙️ 핵심 설계 원칙 (Indie Quant)
+## ⚙️ 핵심 원칙 (Indie Quant)
 
-1. **Pragmatic Integrity**: 모든 금액은 `int64` (Micros/Sats)로 처리. 부동소수점(`float64`) 사용 엄격 금지.
-2. **Single-Thread Hotpath**: 로직에서 `Mutex`를 제거하고 단일 고루틴에서 이벤트를 순차 처리.
-3. **WAL-First**: 상태 반영 전 영속성 계층(SQLite)에 먼저 기록하여 시스템 신뢰성 보장.
-4. **Determinism**: "Backtest is Reality." 로그를 리플레이하면 실제 라이브와 100% 동일한 상태 복원.
+| 원칙 | 설명 |
+|------|------|
+| **Pragmatic Integrity** | `int64` (Micros/Sats) 전용. `float64` 금지 |
+| **Single-Thread** | 단일 고루틴 Hotpath, Mutex 없음 |
+| **WAL-First** | 상태 반영 전 SQLite에 먼저 기록 |
+| **Determinism** | 리플레이 = 라이브 100% 동일 |
 
-## 🧪 데이터 모델 (Data Primitives)
+## 🧪 데이터 타입
 
-- **PriceMicros**: 가격 x 10^6 (1.23 USD = 1,230,000)
-- **QtySats**: 수량 x 10^8 (1.0 BTC = 100,000,000)
-- **TimeStamp**: Unix Microseconds (int64)
+| 타입 | 배율 | 예시 |
+|------|------|------|
+| `PriceMicros` | ×10⁶ | 1.23 USD = 1,230,000 |
+| `QtySats` | ×10⁸ | 1.0 BTC = 100,000,000 |
+| `TimeStamp` | - | Unix Microseconds |
 
-## 🚩 주요 마일스톤 (Milestones)
+## � 시작하기
 
-- **v1.0.0 (Current)**: **Indie Quant Refactoring**. 시퀀서 도입, int64 고정 소수점 연산, SQLite WAL 로깅, 결정론적 리플레이 엔진 구축.
-- **v1.0.1 (Legacy)**: 비동기 시세 파이프라인 및 업비트/비트겟 웹소켓 기본 연동.
-
-## 🚀 실행 및 개발 가이드 (Getting Started)
-
-### 1. 전제 조건
-- Go 1.25.x 이상
-
-### 2. 설치 및 실행
 ```bash
 # 의존성 설치
 go mod tidy
 
-# 애플리케이션 실행
+# 실행
 go run cmd/app/main.go
+
+# 테스트
+go test -v ./...
 ```
 
-### 3. 워크플로우 (Slash Commands)
-- `/build`: 바이너리 빌드 (`bin/app.exe`)
-- `/run`: 애플리케이션 즉시 실행
-- `/test`: 전체 유닛 및 결정론적 리플레이 테스트 실행
+### 워크플로우
+- `/build`: 바이너리 빌드
+- `/run`: 애플리케이션 실행
+- `/test`: 전체 테스트 (Fuzz 포함)
 
-## 🛠️ 개발 문서
+## 📁 프로젝트 구조
 
-- [시스템 디자인 (DESIGN.md)](./DESIGN.md): Indie Quant 핵심 설계 철학 및 MVP 기준
+```
+pkg/
+├── quant/     # 고정소수점 타입 (PriceMicros, QtySats)
+└── safe/      # SafeMath (Panic on Overflow)
+
+internal/
+├── engine/    # Sequencer (단일 스레드 이벤트 처리)
+├── event/     # Event 정의 및 Pool
+├── domain/    # 도메인 객체 (Ticker, Balance, Alert)
+├── storage/   # SQLite WAL 저장소
+└── infra/     # 외부 연동 (Upbit, Bitget, Yahoo)
+
+backtest/      # 결정론적 리플레이 엔진
+```
+
+## � 문서
+
+- [DESIGN.md](./DESIGN.md): Indie Quant 설계 원칙
 
 ---
-*본 프로젝트는 Advanced Agentic Coding 실습의 일환으로 고도화되었습니다 (Last Updated: 2026-01-07).*
+*Last Updated: 2026-01-07*
