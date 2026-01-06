@@ -63,8 +63,8 @@ func (d *IconDownloader) DownloadIcon(symbol string) (string, error) {
 		return filePath, nil // Already exists (Cache Hit)
 	}
 
-	// Construct URL (Using CoinCap CDN)
-	url := fmt.Sprintf("https://assets.coincap.io/assets/icons/%s@2x.png", strings.ToLower(symbol))
+	// Construct URL (Using Upbit CDN - best coverage for Korean exchanges)
+	url := fmt.Sprintf("https://static.upbit.com/logos/%s.png", strings.ToUpper(symbol))
 
 	resp, err := d.client.Get(url)
 	if err != nil {
