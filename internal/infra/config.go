@@ -1,6 +1,7 @@
-﻿package infra
+package infra
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/shopspring/decimal"
@@ -12,8 +13,8 @@ const (
 	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
-// Config???�플리�??�션??모든 ?�정???�습?�다.
-// LoadConfig�?로드???�에???�레???�전?�을 ?�해 ?�기 ?�용?�로 ?�뤄???�니??
+// Config는 애플리케이션의 모든 설정을 담습니다.
+// LoadConfig로 로드된 후에 환경 변수를 통해 민감 내용을 덮어씁니다.
 type Config struct {
 	App struct {
 		Name    string `yaml:"name"`
@@ -54,7 +55,7 @@ type Config struct {
 	} `yaml:"logging"`
 }
 
-// LoadConfig???�정 ?�일???�고 ?�싱?�니??
+// LoadConfig는 설정 파일을 읽고 파싱합니다.
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -66,13 +67,45 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	// 4?� ?�칙: 보안 ?�선 - ?�경 변???�버?�이??지??
+	// 4원칙: 보안 우선 - 환경 변수 오버라이드 지원
 	overrideWithEnv(&cfg)
+
+	// 5원칙: 설정 유효성 검사
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
 
 	return &cfg, nil
 }
 
-// overrideWithEnv???�경 변?��? 존재??경우 ?�정 값을 ??��?�니??
+// Validate checks configuration validity
+func (c *Config) Validate() error {
+	// Upbit
+	if c.API.Upbit.WSURL == "" || (!hasPrefix(c.API.Upbit.WSURL, "ws://") && !hasPrefix(c.API.Upbit.WSURL, "wss://")) {
+		return fmt.Errorf("invalid Upbit WS URL: %s", c.API.Upbit.WSURL)
+	}
+	if len(c.API.Upbit.Symbols) == 0 {
+		return fmt.Errorf("at least one Upbit symbol is required")
+	}
+
+	// Bitget
+	if c.API.Bitget.WSURL == "" || (!hasPrefix(c.API.Bitget.WSURL, "ws://") && !hasPrefix(c.API.Bitget.WSURL, "wss://")) {
+		return fmt.Errorf("invalid Bitget WS URL: %s", c.API.Bitget.WSURL)
+	}
+
+	// UI
+	if c.UI.UpdateIntervalMS <= 0 {
+		return fmt.Errorf("update interval must be positive")
+	}
+
+	return nil
+}
+
+func hasPrefix(s, prefix string) bool {
+	return len(s) >= len(prefix) && s[0:len(prefix)] == prefix
+}
+
+// overrideWithEnv는 환경 변수가 존재할 경우 설정 값을 덮어씁니다.
 func overrideWithEnv(cfg *Config) {
 	if key := os.Getenv("CRYPTO_UPBIT_KEY"); key != "" {
 		cfg.API.Upbit.AccessKey = key
@@ -90,4 +123,3 @@ func overrideWithEnv(cfg *Config) {
 		cfg.API.Bitget.Passphrase = pass
 	}
 }
-

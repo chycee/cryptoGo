@@ -1,4 +1,4 @@
-﻿package infra
+package infra
 
 import (
 	"context"
@@ -140,4 +140,3 @@ func TestExchangeRateClient_RetryOnFailure(t *testing.T) {
 		t.Errorf("Expected rate %v, got %v", expectedRate, client.GetRate())
 	}
 }
-

@@ -1,4 +1,4 @@
-﻿package service
+package service
 
 import (
 	"context"
@@ -148,4 +148,3 @@ func TestPriceService_AsyncTickerChan(t *testing.T) {
 		t.Errorf("Expected 50000000, got %v", btc.Upbit.Price)
 	}
 }
-

@@ -1,4 +1,4 @@
-﻿package service
+package service
 
 import (
 	"context"
@@ -27,14 +27,33 @@ func NewPriceService() *PriceService {
 	}
 }
 
-// GetAllData returns all market data sorted by symbol
+// GetAllData returns a thread-safe deep copy of all market data sorted by symbol
 func (s *PriceService) GetAllData() []*domain.MarketData {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	result := make([]*domain.MarketData, 0, len(s.marketData))
 	for _, data := range s.marketData {
-		result = append(result, data)
+		// Deep copy to prevent race conditions during UI rendering
+		copied := *data
+		// 포인터 필드들도(Ticker 등) Deep Copy 해야 완벽하지만,
+		// Ticker는 덮어쓰여지는 단위이므로 MarketData 레벨의 복사로 1차 방어는 됨.
+		// 더 완벽하게 하려면 Ticker도 복사해야 함. 여기서는 Ticker 구조체가 작으므로 값 복사로 처리 권장.
+
+		if data.Upbit != nil {
+			ticker := *data.Upbit
+			copied.Upbit = &ticker
+		}
+		if data.BitgetS != nil {
+			ticker := *data.BitgetS
+			copied.BitgetS = &ticker
+		}
+		if data.BitgetF != nil {
+			ticker := *data.BitgetF
+			copied.BitgetF = &ticker
+		}
+
+		result = append(result, &copied)
 	}
 
 	// Sort by symbol for consistent ordering

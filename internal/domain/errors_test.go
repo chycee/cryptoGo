@@ -1,4 +1,4 @@
-﻿package domain
+package domain
 
 import (
 	"errors"
@@ -64,4 +64,3 @@ func TestConfigError(t *testing.T) {
 		t.Errorf("Error message = %q, want %q", err.Error(), expected)
 	}
 }
-

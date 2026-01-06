@@ -1,4 +1,4 @@
-﻿package infra
+package infra
 
 import (
 	"math"
@@ -111,4 +111,3 @@ func determineBitgetPrecision(priceStr string) int {
 	}
 	return 0
 }
-

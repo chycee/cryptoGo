@@ -1,4 +1,4 @@
-﻿package infra
+package infra
 
 import (
 	"testing"
@@ -36,4 +36,3 @@ func TestDeterminePrecision(t *testing.T) {
 		})
 	}
 }
-

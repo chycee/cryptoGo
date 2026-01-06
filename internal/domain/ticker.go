@@ -1,4 +1,4 @@
-﻿package domain
+package domain
 
 import "github.com/shopspring/decimal"
 
@@ -82,4 +82,3 @@ func (m *MarketData) ChangeDirection() string {
 	}
 	return "neutral"
 }
-

@@ -1,4 +1,4 @@
-﻿package infra
+package infra
 
 import (
 	"context"
@@ -80,6 +80,7 @@ type UpbitWorker struct {
 	tickerChan chan<- []*domain.Ticker
 	conn       *websocket.Conn
 	mu         sync.RWMutex
+	writeMu    sync.Mutex
 	connected  bool
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
@@ -209,7 +210,7 @@ func (w *UpbitWorker) subscribe() error {
 	// Upbit subscription format:
 	// [{"ticket":"unique-ticket"},{"type":"ticker","codes":["KRW-BTC","KRW-ETH"]}]
 	subscribeMsg := []map[string]interface{}{
-		{"ticket": fmt.Sprintf("crypto-monitor-%d", time.Now().UnixNano())},
+		{"ticket": fmt.Sprintf("crypto-go-%d", time.Now().UnixNano())},
 		{"type": "ticker", "codes": codes},
 	}
 
@@ -226,7 +227,23 @@ func (w *UpbitWorker) subscribe() error {
 		return fmt.Errorf("connection is nil")
 	}
 
-	return conn.WriteMessage(websocket.TextMessage, msgBytes)
+	return w.threadSafeWrite(websocket.TextMessage, msgBytes)
+}
+
+// threadSafeWrite sends a message to the WebSocket connection in a thread-safe manner
+func (w *UpbitWorker) threadSafeWrite(messageType int, data []byte) error {
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
+
+	w.mu.RLock()
+	conn := w.conn
+	w.mu.RUnlock()
+
+	if conn == nil {
+		return fmt.Errorf("connection is nil")
+	}
+
+	return conn.WriteMessage(messageType, data)
 }
 
 // readLoop reads messages from WebSocket

@@ -1,4 +1,4 @@
-﻿package domain
+package domain
 
 import "github.com/shopspring/decimal"
 
@@ -58,4 +58,3 @@ func (a *AlertConfig) CheckCondition(currentPrice decimal.Decimal) bool {
 		return false
 	}
 }
-

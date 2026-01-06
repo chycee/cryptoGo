@@ -1,4 +1,4 @@
-﻿package infra
+package infra
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 )
 
 // =====================================================
-// BitgetSpotWorker - 비트�??�물 WebSocket
+// BitgetSpotWorker - 비트겟 현물 WebSocket
 // =====================================================
 
 // BitgetSpotWorker handles Bitget Spot WebSocket connection
@@ -24,6 +24,7 @@ type BitgetSpotWorker struct {
 	tickerChan chan<- []*domain.Ticker
 	conn       *websocket.Conn
 	mu         sync.RWMutex
+	writeMu    sync.Mutex
 	connected  bool
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
@@ -137,28 +138,40 @@ func (w *BitgetSpotWorker) subscribe() error {
 		return err
 	}
 
+	return w.threadSafeWrite(websocket.TextMessage, msgBytes)
+}
+
+func (w *BitgetSpotWorker) threadSafeWrite(messageType int, data []byte) error {
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
+
 	w.mu.RLock()
 	conn := w.conn
 	w.mu.RUnlock()
 
-	return conn.WriteMessage(websocket.TextMessage, msgBytes)
+	if conn == nil {
+		return fmt.Errorf("connection is nil")
+	}
+
+	return conn.WriteMessage(messageType, data)
 }
 
 func (w *BitgetSpotWorker) pingLoop(ctx context.Context) {
 	ticker := time.NewTicker(bitgetPingInterval)
 	defer ticker.Stop()
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("Bitget Spot pingLoop panic recovered", slog.Any("panic", r))
+		}
+	}()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			w.mu.RLock()
-			conn := w.conn
-			w.mu.RUnlock()
-
-			if conn != nil {
-				conn.WriteMessage(websocket.TextMessage, []byte("ping"))
+			if err := w.threadSafeWrite(websocket.TextMessage, []byte("ping")); err != nil {
+				slog.Warn("Bitget Spot ping failed", slog.Any("error", err))
 			}
 		}
 	}
@@ -274,4 +287,3 @@ func (w *BitgetSpotWorker) IsConnected() bool {
 	defer w.mu.RUnlock()
 	return w.connected
 }
-

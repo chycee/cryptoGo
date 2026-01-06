@@ -1,4 +1,4 @@
-﻿package domain
+package domain
 
 import (
 	"testing"
@@ -66,4 +66,3 @@ func TestAlertConfig_CheckCondition(t *testing.T) {
 		}
 	})
 }
-

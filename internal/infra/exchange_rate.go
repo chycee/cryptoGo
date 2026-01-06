@@ -1,4 +1,4 @@
-﻿package infra
+package infra
 
 import (
 	"context"
@@ -167,7 +167,7 @@ func (c *ExchangeRateClient) doFetch(ctx context.Context) error {
 		return fmt.Errorf("empty response from Dunamu API")
 	}
 
-	// Use basePrice (매매기�??? as the exchange rate
+	// Use basePrice (매매기준율) as the exchange rate
 	newRate := decimal.NewFromFloat(data[0].BasePrice)
 
 	c.mu.Lock()
@@ -201,4 +201,3 @@ func (c *ExchangeRateClient) GetRate() decimal.Decimal {
 	defer c.mu.RUnlock()
 	return c.rate
 }
-

@@ -1,4 +1,4 @@
-﻿package infra
+package infra
 
 import (
 	"testing"
@@ -56,4 +56,3 @@ func TestCalculateBitgetBackoff(t *testing.T) {
 		}
 	}
 }
-

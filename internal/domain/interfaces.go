@@ -1,4 +1,4 @@
-﻿package domain
+package domain
 
 import (
 	"context"
@@ -25,4 +25,3 @@ type MarketDataRepository interface {
 	FindAll() ([]*MarketData, error)
 	FindBySymbol(symbol string) (*MarketData, error)
 }
-

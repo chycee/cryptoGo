@@ -1,4 +1,4 @@
-﻿package domain
+package domain
 
 import (
 	"testing"
@@ -54,4 +54,3 @@ func TestMarketData_IsBreakoutHigh(t *testing.T) {
 		}
 	})
 }
-

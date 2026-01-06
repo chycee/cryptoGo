@@ -1,4 +1,4 @@
-﻿package domain
+package domain
 
 import "errors"
 
@@ -77,4 +77,3 @@ var (
 	// ErrConfigNotFound is returned when configuration file is missing
 	ErrConfigNotFound = errors.New("configuration not found")
 )
-
