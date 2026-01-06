@@ -10,7 +10,7 @@
 
 ```mermaid
 graph LR
-    subgraph Gateways
+    subgraph Exchanges[거래소]
         UB[Upbit WS] --> SEQ
         BG[Bitget WS] --> SEQ
     end

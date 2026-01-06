@@ -29,7 +29,7 @@
 | Overflow Policy | Drop with warning log (non-blocking send) |
 
 ```
-[Upbit/Bitget WS] → [Gateway Worker] → [Bounded Chan] → [Sequencer] → [State]
+[Upbit/Bitget WS] → [Exchange Worker] → [Bounded Chan] → [Sequencer] → [State]
                           ↓                                   ↓
                       (Mutex OK)                         (NO Mutex)
 
