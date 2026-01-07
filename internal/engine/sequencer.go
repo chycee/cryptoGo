@@ -2,9 +2,10 @@ package engine
 
 import (
 	"context"
+	"crypto_go/internal/domain"
 	"crypto_go/internal/event"
 	"crypto_go/internal/storage"
-	"crypto_go/pkg/quant"
+	"crypto_go/internal/strategy"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -12,40 +13,37 @@ import (
 	"sync"
 )
 
-// MarketState holds the current state of a single market.
-// Fields are ordered for cache-line efficiency: hot fields (price/qty) first.
-type MarketState struct {
-	// Hot fields (frequently accessed together in the hotpath)
-	PriceMicros     quant.PriceMicros `json:"price"`
-	TotalQtySats    quant.QtySats     `json:"qty"`
-	LastUpdateUnixM quant.TimeStamp   `json:"last_update"`
-	// Cold fields (less frequent access)
-	Symbol string `json:"symbol"`
-}
+
+
 
 // Sequencer is the core single-threaded event processor.
 type Sequencer struct {
 	inbox   chan event.Event
-	markets map[string]*MarketState
+	markets map[string]*domain.MarketState
 	nextSeq uint64
 	store   *storage.EventStore
 
+	strategy strategy.Strategy
+
 	// Boundary: used to notify UI or other systems of state changes
-	onStateUpdate func(*MarketState)
+	onStateUpdate func(*domain.MarketState)
 
 	mu sync.RWMutex // Used only for external reads (e.g. UI)
 }
 
+
 // NewSequencer creates a new sequencer instance.
-func NewSequencer(inboxSize int, store *storage.EventStore, onUpdate func(*MarketState)) *Sequencer {
+func NewSequencer(inboxSize int, store *storage.EventStore, strat strategy.Strategy, onUpdate func(*domain.MarketState)) *Sequencer {
 	return &Sequencer{
 		inbox:         make(chan event.Event, inboxSize),
-		markets:       make(map[string]*MarketState),
+		markets:       make(map[string]*domain.MarketState),
 		nextSeq:       1,
 		store:         store,
+		strategy:      strat,
 		onStateUpdate: onUpdate,
 	}
 }
+
 
 // Inbox returns the event channel. External workers send events here.
 func (s *Sequencer) Inbox() chan<- event.Event {
@@ -127,7 +125,7 @@ func (s *Sequencer) ReplayEvent(ev event.Event) {
 func (s *Sequencer) handleMarketUpdate(e *event.MarketUpdateEvent) {
 	state, ok := s.markets[e.Symbol]
 	if !ok {
-		state = &MarketState{Symbol: e.Symbol}
+		state = &domain.MarketState{Symbol: e.Symbol}
 		s.markets[e.Symbol] = state
 	}
 
@@ -136,34 +134,46 @@ func (s *Sequencer) handleMarketUpdate(e *event.MarketUpdateEvent) {
 	state.TotalQtySats = e.QtySats
 	state.LastUpdateUnixM = e.Ts
 
+	// Invoke Strategy
+	if s.strategy != nil {
+		actions := s.strategy.OnMarketUpdate(*state)
+		for _, action := range actions {
+			slog.Info("STRATEGY_ACTION", slog.Any("action", action))
+			// TODO: Convert Action to OrderRequestEvent and process effectively
+		}
+	}
+
 	if s.onStateUpdate != nil {
 		s.onStateUpdate(state)
 	}
 }
 
+
 // GetMarketState returns a snapshot of the market state (external read).
-func (s *Sequencer) GetMarketState(symbol string) (MarketState, bool) {
+func (s *Sequencer) GetMarketState(symbol string) (domain.MarketState, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	state, ok := s.markets[symbol]
 	if !ok {
-		return MarketState{}, false
+		return domain.MarketState{}, false
 	}
 	return *state, true // Return copy
 }
+
 
 // DumpState writes the entire internal state to a file (for post-mortem).
 func (s *Sequencer) DumpState(filename string) {
 	slog.Info("Dumping internal state...", slog.String("file", filename))
 
 	data := struct {
-		NextSeq uint64                  `json:"next_seq"`
-		Markets map[string]*MarketState `json:"markets"`
+		NextSeq uint64                         `json:"next_seq"`
+		Markets map[string]*domain.MarketState `json:"markets"`
 	}{
 		NextSeq: s.nextSeq,
 		Markets: s.markets,
 	}
+
 
 	b, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {

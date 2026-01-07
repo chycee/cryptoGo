@@ -9,7 +9,7 @@ import (
 )
 
 func TestSequencer_MarketUpdate(t *testing.T) {
-	seq := NewSequencer(10, nil, nil)
+	seq := NewSequencer(10, nil, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -37,7 +37,7 @@ func TestSequencer_MarketUpdate(t *testing.T) {
 }
 
 func TestSequencer_GapDetection(t *testing.T) {
-	seq := NewSequencer(10, nil, nil)
+	seq := NewSequencer(10, nil, nil, nil)
 
 	// Should panic when receiving out-of-order event
 	defer func() {
