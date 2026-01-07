@@ -74,6 +74,15 @@ graph LR
 ### 4. `internal/execution` (Action)
 *   **Interface**: `SubmitOrder`, `CancelOrder`.
 *   **MockExecution**: MVP 단계에서의 안전한 테스트 실행기.
+*   **PaperExecution**: 가상 잔고로 전략 검증.
+
+### 5. `internal/infra` (Advanced)
+*   **Circuit Breaker**: 외부 API 장애 자동 격리.
+*   **Metrics**: Atomic Counter 기반 경량 모니터링.
+
+### 6. `internal/storage` (Persistence)
+*   **WAL**: 이벤트 로깅 및 복구.
+*   **Snapshot**: 빠른 상태 복원.
 
 ---
 

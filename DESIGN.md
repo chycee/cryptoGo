@@ -196,3 +196,24 @@ internal/
     *   `Strategy`: `OnMarketUpdate(State) -> []Order` (Pure Function)
     *   `Execution`: `SubmitOrder(Order)` (Mock & Real Interface)
 *   **Why?**: "건축 도면(Interface) 없이 벽돌(Code)부터 쌓지 않는다."
+
+---
+
+## 10. ADVANCED FEATURES (초고도화)
+
+### **Performance**
+| 기능 | 결과 |
+|------|------|
+| **Benchmark** | Hotpath 5.22 ns/op, **Zero-Alloc** |
+| **Metrics** | Atomic Counter 기반 경량 모니터링 |
+
+### **Reliability**
+| 기능 | 용도 |
+|------|------|
+| **Circuit Breaker** | 외부 API 장애 시 자동 차단 |
+| **Snapshot System** | 빠른 상태 복구 (WAL 전체 재생 불필요) |
+
+### **Trading**
+| 기능 | 용도 |
+|------|------|
+| **Paper Trading** | 가상 잔고로 전략 검증 |
