@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"crypto_go/internal/event"
+	"crypto_go/internal/infra"
 	"crypto_go/pkg/quant"
 
 	"github.com/gorilla/websocket"
@@ -78,7 +79,7 @@ func (w *Worker) connectionLoop(ctx context.Context) {
 
 		if err := w.connect(ctx); err != nil {
 			slog.Warn("Upbit connection failed", slog.Any("error", err), slog.Int("retry", retryCount))
-			delay := w.calculateBackoff(retryCount)
+			delay := infra.CalculateBackoff(retryCount)
 			retryCount++
 			if retryCount > maxRetries {
 				retryCount = 0
@@ -94,15 +95,6 @@ func (w *Worker) connectionLoop(ctx context.Context) {
 			w.readLoop(ctx)
 		}
 	}
-}
-
-func (w *Worker) calculateBackoff(retryCount int) time.Duration {
-	exp := time.Duration(1 << uint(retryCount))
-	delay := baseDelay * exp
-	if delay > maxDelay || exp == 0 {
-		delay = maxDelay
-	}
-	return delay
 }
 
 func (w *Worker) connect(ctx context.Context) error {

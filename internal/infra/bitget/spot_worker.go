@@ -97,7 +97,11 @@ func (w *SpotWorker) subscribe() error {
 		args = append(args, subscribeArg{InstType: "SPOT", Channel: "ticker", InstId: id})
 	}
 	req := subscribeRequest{Op: "subscribe", Args: args}
-	b, _ := json.Marshal(req)
+	b, err := json.Marshal(req)
+	if err != nil {
+		slog.Error("Failed to marshal subscribe request", slog.Any("error", err))
+		return err
+	}
 	return w.threadSafeWrite(websocket.TextMessage, b)
 }
 
