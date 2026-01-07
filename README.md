@@ -1,4 +1,4 @@
-# 🚀 CryptoGo: Indie Quant Framework
+# 🚀 CryptoGo: Quant Framework
 
 **CryptoGo**는 초고속 의사결정과 완벽한 검증(Backtest is Reality)을 목표로 하는 **Go 언어 기반의 결정론적(Deterministic) 퀀트 트레이딩 프레임워크**입니다.
 
