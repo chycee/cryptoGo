@@ -3,11 +3,12 @@ package execution
 import (
 	"context"
 	"crypto_go/internal/domain"
+	"crypto_go/pkg/quant"
 	"testing"
 )
 
 func TestPaperExecution_Buy(t *testing.T) {
-	paper := NewPaperExecution()
+	paper := NewPaperExecution(quant.ToPriceMicros(100_000_000))
 
 	// Setup: deposit 10000 USDT
 	paper.Deposit("USDT", 10000_000000)        // 10000 USDT in Sats
@@ -52,7 +53,7 @@ func TestPaperExecution_Buy(t *testing.T) {
 }
 
 func TestPaperExecution_Sell(t *testing.T) {
-	paper := NewPaperExecution()
+	paper := NewPaperExecution(quant.ToPriceMicros(100_000_000))
 
 	// Setup: deposit 1 BTC
 	paper.Deposit("BTC", 100_000000)           // 1 BTC in Sats
@@ -87,7 +88,7 @@ func TestPaperExecution_Sell(t *testing.T) {
 }
 
 func TestPaperExecution_InsufficientBalance(t *testing.T) {
-	paper := NewPaperExecution()
+	paper := NewPaperExecution(quant.ToPriceMicros(100_000_000))
 
 	// Setup: deposit only 100 USDT
 	paper.Deposit("USDT", 100_000000)
@@ -109,5 +110,5 @@ func TestPaperExecution_InsufficientBalance(t *testing.T) {
 }
 
 func TestPaperExecution_ImplementsInterface(t *testing.T) {
-	var _ Execution = (*PaperExecution)(nil)
+	var _ domain.Execution = (*PaperExecution)(nil)
 }
