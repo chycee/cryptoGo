@@ -13,6 +13,19 @@ type Order struct {
 	CreatedUnixM int64  // Unix Microseconds
 }
 
+const (
+	SideBuy  = "BUY"
+	SideSell = "SELL"
+
+	OrderTypeLimit  = "LIMIT"
+	OrderTypeMarket = "MARKET"
+
+	OrderStatusNew             = "NEW"
+	OrderStatusPartiallyFilled = "PARTIALLY_FILLED"
+	OrderStatusFilled          = "FILLED"
+	OrderStatusCanceled        = "CANCELED"
+)
+
 // IsOpen checks if the order is still active.
 func (o *Order) IsOpen() bool {
 	return o.Status == "NEW" || o.Status == "PARTIALLY_FILLED"
