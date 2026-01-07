@@ -12,9 +12,9 @@ import (
 	"crypto_go/pkg/quant"
 )
 
-// Helper function to create Yahoo Finance mock response
-func createYahooMockResponse(price float64) yahooChartResponse {
-	return yahooChartResponse{
+// Helper function to create mock response for exchange rate API
+func createMockRateResponse(price float64) rateAPIResponse {
+	return rateAPIResponse{
 		Chart: struct {
 			Result []struct {
 				Meta struct {
@@ -57,8 +57,8 @@ func createYahooMockResponse(price float64) yahooChartResponse {
 }
 
 func TestExchangeRateClient_FetchRate(t *testing.T) {
-	// Create mock server with Yahoo Finance response
-	mockResp := createYahooMockResponse(1380.50)
+	// Create mock server with exchange rate API response
+	mockResp := createMockRateResponse(1380.50)
 	mockBody, _ := json.Marshal(mockResp)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +103,7 @@ func TestExchangeRateClient_StartStop(t *testing.T) {
 	callCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
-		mockResp := createYahooMockResponse(1380.50)
+		mockResp := createMockRateResponse(1380.50)
 		body, _ := json.Marshal(mockResp)
 		w.WriteHeader(http.StatusOK)
 		w.Write(body)
@@ -134,8 +134,8 @@ func TestExchangeRateClient_StartStop(t *testing.T) {
 }
 
 func TestExchangeRateClient_EmptyResponse(t *testing.T) {
-	// Yahoo Finance returns empty result array
-	emptyResp := yahooChartResponse{}
+	// API returns empty result array
+	emptyResp := rateAPIResponse{}
 	emptyResp.Chart.Result = nil
 	mockBody, _ := json.Marshal(emptyResp)
 
@@ -163,7 +163,7 @@ func TestExchangeRateClient_RetryOnFailure(t *testing.T) {
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
-		mockResp := createYahooMockResponse(1380.50)
+		mockResp := createMockRateResponse(1380.50)
 		body, _ := json.Marshal(mockResp)
 		w.WriteHeader(http.StatusOK)
 		w.Write(body)

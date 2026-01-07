@@ -9,11 +9,11 @@
 ## 🎯 MVP Scope
 
 ### 1. Monitoring First (✅ Implemented)
-*   **Data Aggregation**: Upbit(KRW), Bitget(USDT), Yahoo Finance(USD/KRW) 데이터를 실시간 통합.
+*   **Data Aggregation**: Upbit(KRW), Bitget(USDT), Exchange Rate(USD/KRW) 데이터를 실시간 통합.
 *   **Zero-Risk**: 매매 로직 없이 시장을 완벽하게 관찰하는 것을 최우선 목표로 함.
 *   **Infrastructure**:
     *   **Bitget**: Spot & Futures 모두 최신 **V2 API** 적용 (`USDT-FUTURES`).
-    *   **Exchange Rate**: Yahoo Finance를 통한 안정적 환율 수신.
+    *   **Exchange Rate**: 환율 API를 통한 안정적 환율 수신.
 
 ### 2. Trading Skeleton (✅ Ready)
 *   **Architecture**: 매매 로직을 담을 그릇(Interface)과 데이터 구조(Entity) 완성.
@@ -30,7 +30,7 @@ graph LR
     subgraph Inputs ["I/O Layer"]
         UB[Upbit WS] -->|Chan| Inbox
         BG[Bitget V2] -->|Chan| Inbox
-        YH[Yahoo Rate] -->|Chan| Inbox
+        FX[ExchangeRate] -->|Chan| Inbox
     end
 
     subgraph Core ["Sequencer (Single Thread)"]
@@ -64,7 +64,7 @@ graph LR
 ### 2. `internal/infra` (Gateways)
 *   `upbit`: 업비트 웹소켓 (KRW 마켓).
 *   `bitget`: 비트겟 V2 API (Spot / Futures `USDT-FUTURES`).
-*   `exchange_rate`: Yahoo Finance 환율 정보.
+*   `exchange_rate`: USD/KRW 환율 정보.
 *   **Common**: 지수 백오프(Exponential Backoff) 표준 적용.
 
 ### 3. `internal/strategy` (Logic)

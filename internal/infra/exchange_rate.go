@@ -13,8 +13,9 @@ import (
 	"crypto_go/pkg/quant"
 )
 
-// yahooChartResponse represents the Yahoo Finance Chart API response
-type yahooChartResponse struct {
+// rateAPIResponse represents the exchange rate API response.
+// Currently implements Yahoo Finance Chart API format, but provider can be swapped.
+type rateAPIResponse struct {
 	Chart struct {
 		Result []struct {
 			Meta struct {
@@ -31,7 +32,7 @@ type yahooChartResponse struct {
 	} `json:"chart"`
 }
 
-// ExchangeRateClient fetches USD/KRW exchange rate from Yahoo Finance API
+// ExchangeRateClient fetches USD/KRW exchange rate from configured API.
 type ExchangeRateClient struct {
 	inbox        chan<- event.Event
 	nextSeq      *uint64 // Pointer to a shared/global atomic or managed sequence
@@ -159,18 +160,18 @@ func (c *ExchangeRateClient) doFetch(ctx context.Context) error {
 		return err
 	}
 
-	var data yahooChartResponse
+	var data rateAPIResponse
 	if err := json.Unmarshal(body, &data); err != nil {
 		return err
 	}
 
 	// Check for API error
 	if data.Chart.Error != nil {
-		return fmt.Errorf("Yahoo API error: %s - %s", data.Chart.Error.Code, data.Chart.Error.Description)
+		return fmt.Errorf("rate API error: %s - %s", data.Chart.Error.Code, data.Chart.Error.Description)
 	}
 
 	if len(data.Chart.Result) == 0 {
-		return fmt.Errorf("empty response from Yahoo Finance API")
+		return fmt.Errorf("empty response from exchange rate API")
 	}
 
 	// Use regularMarketPrice as the exchange rate (USD/KRW)
@@ -185,7 +186,7 @@ func (c *ExchangeRateClient) doFetch(ctx context.Context) error {
 		Symbol:      "USD/KRW",
 		PriceMicros: price,
 		QtySats:     quant.QtyScale, // 1.0 fixed for rate
-		Exchange:    "YAHOO",
+		Exchange:    "FX",
 	}
 
 	return nil

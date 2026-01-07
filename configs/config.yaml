@@ -36,7 +36,7 @@ api:
       DOGE: "DOGEUSDT"
   
   exchange_rate:
-    # Yahoo Finance USD/KRW 환율
+    # USD/KRW 환율 API (Provider 교체 가능)
     url: "https://query1.finance.yahoo.com/v8/finance/chart/KRW=X"
     poll_interval_sec: 60
 

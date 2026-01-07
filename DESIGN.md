@@ -160,7 +160,7 @@ internal/
 ├── storage/        # Persistence (WAL)
 └── infra/          # Exchange Adapters (Provider Isolated)
     ├── backoff.go  # Standard Exponential Backoff
-    ├── exchange_rate.go # USD/KRW Rate Source (Yahoo)
+    ├── exchange_rate.go # USD/KRW Rate Source
     ├── upbit/      # Upbit WebSocket Worker
     └── bitget/     # Bitget Spot/Futures Worker (V2)
 ```
@@ -175,7 +175,7 @@ internal/
 |-----------|----------|-----------|
 | **Bitget Spot** | API V2 | 최신 표준 준수 (Modern API). |
 | **Bitget Futures** | API V2 (`USDT-FUTURES`) | `USDS-FUT` 문서 오류 수정 -> `USDT-FUTURES`로 해결. (V2 통합) |
-| **ExchangeRate** | Yahoo Finance | Dunamu API 불안정성 대비. Global Standard Source 채택. |
+| **ExchangeRate** | 환율 API | 안정적 환율 소스. Provider 교체 가능 구조. |
 | **Backoff** | Shared Exponential | 모든 연결 재시도 로직에 `infra.Backoff` 표준 적용 (Jitter 포함). |
 
 ---
