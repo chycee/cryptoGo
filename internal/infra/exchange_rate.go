@@ -14,7 +14,7 @@ import (
 )
 
 // rateAPIResponse represents the exchange rate API response.
-// Currently implements Yahoo Finance Chart API format, but provider can be swapped.
+// Provider can be swapped by changing the API URL and response parsing.
 type rateAPIResponse struct {
 	Chart struct {
 		Result []struct {
@@ -112,7 +112,7 @@ func (c *ExchangeRateClient) Stop() {
 	}
 }
 
-// fetchRate fetches the current exchange rate from Yahoo Finance API with retry logic
+// fetchRate fetches the current exchange rate from configured API with retry logic
 func (c *ExchangeRateClient) fetchRate(ctx context.Context) error {
 	var lastErr error
 	for i := 0; i < 3; i++ {
