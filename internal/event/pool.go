@@ -68,3 +68,27 @@ func ReleaseOrderUpdateEvent(ev *OrderUpdateEvent) {
 
 	orderUpdatePool.Put(ev)
 }
+
+// Warmup pre-allocates event objects to reduce GC pressure at startup.
+// It acquires and releases a batch of events.
+func Warmup() {
+	const batchSize = 1000
+	
+	// Warmup MarketUpdate Events
+	marketEvs := make([]*MarketUpdateEvent, 0, batchSize)
+	for i := 0; i < batchSize; i++ {
+		marketEvs = append(marketEvs, AcquireMarketUpdateEvent())
+	}
+	for _, ev := range marketEvs {
+		ReleaseMarketUpdateEvent(ev)
+	}
+
+	// Warmup OrderUpdate Events
+	orderEvs := make([]*OrderUpdateEvent, 0, batchSize)
+	for i := 0; i < batchSize; i++ {
+		orderEvs = append(orderEvs, AcquireOrderUpdateEvent())
+	}
+	for _, ev := range orderEvs {
+		ReleaseOrderUpdateEvent(ev)
+	}
+}

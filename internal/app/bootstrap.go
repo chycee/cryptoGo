@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"crypto_go/internal/domain"
+	"crypto_go/internal/event"
 	"crypto_go/internal/infra"
 	"crypto_go/internal/storage"
 	"encoding/json"
@@ -27,6 +28,10 @@ func NewBootstrap() *Bootstrap {
 // Initialize performs core system initialization (DB, Dir, etc.)
 func (b *Bootstrap) Initialize() error {
 	slog.Info("🚀 Bootstrapping Crypto Go...")
+
+	// 0. Runtime Warmup (GC Optimization)
+	event.Warmup()
+	slog.Info("🔥 Event Pool Warmed up")
 
 	// 1. Load Config
 	cfg, err := infra.LoadConfig("configs/config.yaml")

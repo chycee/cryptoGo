@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"sync"
 	"time"
 
@@ -55,8 +54,12 @@ func (w *SpotWorker) connectionLoop(ctx context.Context) {
 		}
 
 		if err := w.connect(ctx); err != nil {
-			slog.Warn("Bitget Spot connection failed", slog.Any("error", err))
-			time.Sleep(baseDelay) // Simple backoff for brevity
+			slog.Warn("Bitget Spot connection failed", slog.Any("error", err), slog.Int("retry", retryCount))
+			retryCount++
+			if retryCount > maxRetries {
+				retryCount = 0 // Infinite retry loop for monitoring
+			}
+			time.Sleep(baseDelay * time.Duration(retryCount)) 
 		} else {
 			retryCount = 0
 			w.readLoop(ctx)
@@ -151,19 +154,26 @@ func (w *SpotWorker) handleMessage(msg []byte) {
 	json.Unmarshal(msg, &resp)
 	if resp.Arg.Channel != "ticker" || len(resp.Data) == 0 { return }
 
-	ts, _ := quant.ParseTimeStamp(resp.Ts)
+	// Bitget sends Timestamp in Milliseconds (int64)
+	ts := quant.TimeStamp(resp.Ts * 1000)
+	
 	for _, data := range resp.Data {
 		symbol := w.findSymbol(data.InstId)
 		if symbol == "" { continue }
 
-		ev := &event.MarketUpdateEvent{
-			BaseEvent: event.BaseEvent{Seq: quant.NextSeq(w.seq), Ts: ts},
-			Symbol:      symbol,
-			PriceMicros: quant.ToPriceMicrosStr(data.LastPr),
-			QtySats:     quant.ToQtySatsStr(data.BaseVolume),
-			Exchange:    "BITGET_S",
+		ev := event.AcquireMarketUpdateEvent()
+		ev.Seq = quant.NextSeq(w.seq)
+		ev.Ts = ts
+		ev.Symbol = symbol
+		ev.PriceMicros = quant.ToPriceMicrosStr(data.LastPr)
+		ev.QtySats = quant.ToQtySatsStr(data.BaseVolume)
+		ev.Exchange = "BITGET_S"
+
+		select { 
+		case w.inbox <- ev: 
+		default: 
+			event.ReleaseMarketUpdateEvent(ev) // Release if dropped
 		}
-		select { case w.inbox <- ev: default: }
 	}
 }
 
