@@ -43,12 +43,12 @@
 
 ```mermaid
 graph LR
-    subgraph Inputs [I/O Layer]
+    subgraph Inputs ["I/O Layer"]
         UB[Upbit WS] -->|Chan| Inbox
         BG[Bitget WS] -->|Chan| Inbox
     end
 
-    subgraph Core [Sequencer (Single Thread)]
+    subgraph Core ["Sequencer (Single Thread)"]
         Inbox((Inbox)) -->|Event| Check[Gap Check]
         Check -->|Event| WAL[(SQLite WAL)]
         WAL --> Logic{Process Event}
@@ -152,17 +152,17 @@ pkg/
 └── safe/           # Overflow-Panic 연산 (Fail-Fast)
 
 internal/
-├── domain/         # Entity (Balance, MarketState - Invariant Checked)
+├── domain/         # Entity (Order, Position, MarketState - Int64 Only)
 ├── engine/         # Sequencer (WAL + Single Thread Logic)
 ├── event/          # Event Definitions & Pooling (sync.Pool)
-├── strategy/       # 매매 전략 (Zero-Alloc Ring Buffer)
+├── strategy/       # 매매 전략 (OnMarketUpdate -> []Order)
+├── execution/      # 주문 집행 (SubmitOrder) & Mocking
 ├── storage/        # Persistence (WAL)
 └── infra/          # Exchange Adapters (Provider Isolated)
     ├── backoff.go  # Standard Exponential Backoff
-    ├── exchange_rate.go # USD/KRW Rate Source
+    ├── exchange_rate.go # USD/KRW Rate Source (Yahoo)
     ├── upbit/      # Upbit WebSocket Worker
-    ├── bitget/     # Bitget Spot/Futures Worker
-    └── ls/         # LS Securities (Future Stub)
+    └── bitget/     # Bitget Spot/Futures Worker (V2)
 ```
 
 **"복잡함은 적이다. 백테스트는 현실이다."**
@@ -190,9 +190,9 @@ internal/
 *   **Zero-Risk**: 매매 로직 없이 오직 '관찰'만 수행하므로 자산 손실 위험 0%.
 *   **Goal**: "눈으로 보는 데이터가 실제 거래소와 100% 일치해야 한다."
 
-### **2. Foundation: Automated Trading Structure (SKELETON)**
+### **2. Foundation: Automated Trading Structure (IMPLEMENTED)**
 *   **Structural Readiness**: 당장 매매는 안 하지만, 언제든 로직만 채우면 돌아가도록 설계.
 *   **Interface-First**:
-    *   `Strategy`: `OnMarketUpdate(State) -> Signal` (껍데기)
-    *   `Execution`: `SubmitOrder(Order)` (Mocking)
+    *   `Strategy`: `OnMarketUpdate(State) -> []Order` (Pure Function)
+    *   `Execution`: `SubmitOrder(Order)` (Mock & Real Interface)
 *   **Why?**: "건축 도면(Interface) 없이 벽돌(Code)부터 쌓지 않는다."

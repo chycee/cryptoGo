@@ -2,7 +2,22 @@
 
 **CryptoGo**는 초고속 의사결정과 완벽한 검증(Backtest is Reality)을 목표로 하는 **Go 언어 기반의 결정론적(Deterministic) 퀀트 트레이딩 프레임워크**입니다.
 
-"복잡함은 적이다(Complexity is the Enemy)"라는 철학 아래, **단일 스레드 시퀀서(Single-Threaded Sequencer)** 아키텍처를 채택하여 동시성 문제를 원천 차단했습니다.
+> **Current Status**: MVP Phase 1 (Monitoring Implemented / Trading Skeleton Ready)
+
+---
+
+## 🎯 MVP Scope
+
+### 1. Monitoring First (✅ Implemented)
+*   **Data Aggregation**: Upbit(KRW), Bitget(USDT), Yahoo Finance(USD/KRW) 데이터를 실시간 통합.
+*   **Zero-Risk**: 매매 로직 없이 시장을 완벽하게 관찰하는 것을 최우선 목표로 함.
+*   **Infrastructure**:
+    *   **Bitget**: Spot & Futures 모두 최신 **V2 API** 적용 (`USDT-FUTURES`).
+    *   **Exchange Rate**: Yahoo Finance를 통한 안정적 환율 수신.
+
+### 2. Trading Skeleton (✅ Ready)
+*   **Architecture**: 매매 로직을 담을 그릇(Interface)과 데이터 구조(Entity) 완성.
+*   **Mock Execution**: 실제 주문 전송 없이 로직을 검증할 수 있는 안전 장치.
 
 ---
 
@@ -12,58 +27,53 @@
 
 ```mermaid
 graph LR
-    subgraph Inputs [I/O Layer]
+    subgraph Inputs ["I/O Layer"]
         UB[Upbit WS] -->|Chan| Inbox
-        BG[Bitget WS] -->|Chan| Inbox
+        BG[Bitget V2] -->|Chan| Inbox
+        YH[Yahoo Rate] -->|Chan| Inbox
     end
 
-    subgraph Core [Sequencer (Single Thread)]
+    subgraph Core ["Sequencer (Single Thread)"]
         Inbox((Inbox)) -->|Event| Check[Gap Check]
         Check -->|Event| WAL[(SQLite WAL)]
         WAL --> Logic{Process Event}
         Logic -->|MarketState| Strategy[Strategy Mode]
-        Strategy -->|Action| Exec[Execution]
+        Strategy -->|Order| Exec[Execution]
         Logic -->|Update| State[In-Memory State]
     end
 
-    subgraph Output [Actions]
-        Exec -->|Order| API[Exchange API]
-        State -->|Snapshot| UI[User Interface]
+    subgraph Output ["Actions"]
+        Exec -->|Order| API[Exchange API / Mock]
+        State -->|Snapshot| UI[TUI / Log]
     end
 ```
 
-### 핵심 컴포넌트
-1.  **Sequencer (엔진)**: 모든 이벤트(시세, 주문체결 등)를 **단 하나의 고루틴**에서 순차적으로 처리합니다. Mutex가 전혀 필요 없습니다.
-2.  **Strategies (두뇌)**: 시세 변동 시 동기적(Synchronous)으로 호출되며, 매수/매도 신호(Action)를 반환합니다.
-3.  **Infrastructure (손발)**: 외부 거래소 통신 모듈입니다. 거래소별(Provider)로 독립적인 패키지로 격리되어 있습니다.
+### 핵심 원칙
+1.  **Single Threaded**: 모든 상태 변경은 단일 고루틴에서 순차 처리 (No Mutex, No Deadlock).
+2.  **Int64 Only**: 돈과 수량은 오직 `int64` (Micros/Sats)만 사용. `float` 사용 시 빌드 경고.
+3.  **Fail Fast**: 오버플로우나 데이터 유실 감지 시 즉시 시스템 중단 (Panic).
 
 ---
 
 ## 🛠️ 모듈별 상세 (Modules)
 
-이 프레임워크는 **안전성(Safety)**과 **성능(Performance)**을 최우선으로 설계되었습니다.
+### 1. `internal/domain` (Entities)
+*   **`Order` / `Position`**: 매매의 핵심 객체. 엄격한 타입 정의 (`PriceMicros`, `QtySats`).
+*   **`MarketState`**: 통합된 시장 상황 (현재가, 호가 등).
 
-### 1. `pkg/safe` & `pkg/quant` (Core Data)
-*   **Integer Only**: 모든 돈과 수량은 `int64`입니다. 부동소수점(`float`) 사용은 **엄격히 금지**됩니다.
-    *   `PriceMicros`: 1 KRW = 1,000,000 (마이크로 단위)
-    *   `QtySats`: 1 BTC = 100,000,000 (사토시 단위)
-*   **Safety Math**: `SafeAdd`, `SafeMul` 등의 함수는 오버플로우 발생 시 **즉시 패닉(Panic)**을 일으켜 시스템을 멈춥니다.
+### 2. `internal/infra` (Gateways)
+*   `upbit`: 업비트 웹소켓 (KRW 마켓).
+*   `bitget`: 비트겟 V2 API (Spot / Futures `USDT-FUTURES`).
+*   `exchange_rate`: Yahoo Finance 환율 정보.
+*   **Common**: 지수 백오프(Exponential Backoff) 표준 적용.
 
-### 2. `internal/engine` (Sequencer)
-*   **Hotpath**: 주문 처리의 핵심 경로입니다.
-*   **Gap Detection**: 수신된 이벤트의 시퀀스 번호(Seq)가 비어있다면, 데이터 유실로 간주하고 즉시 셧다운합니다.
-*   **Zero-Alloc Policy**: 런타임 중 힙 메모리 할당(`GC Overhead`)을 최소화합니다.
+### 3. `internal/strategy` (Logic)
+*   **Interface**: `OnMarketUpdate(State) -> []Order`
+*   **Reference**: `SMACrossStrategy` (Ring Buffer 최적화, Zero-Alloc).
 
-### 3. `internal/infra` (Gateways)
-거래소별로 프로토콜이 다르므로, 자산군(Asset Class)이 아닌 **제공자(Provider)** 기준으로 패키지를 분리했습니다.
-
-*   `internal/infra/upbit`: 업비트 웹소켓
-*   `internal/infra/bitget`: 비트겟 웹소켓 (Spot + Futures)
-*   `internal/infra/ls`: LS증권 (Webhook/API Stub - Future Impl)
-
-### 4. `internal/strategy` (Trading Logic)
-*   **Interface**: 모든 전략은 `OnMarketUpdate(state)` 메서드를 구현해야 합니다.
-*   **Zero-Alloc Pattern**: `SMACrossStrategy` 레퍼런스 구현체는 **Ring Buffer**를 사용하여, 루프 내에서 메모리 할당 없이 이동평균을 계산합니다.
+### 4. `internal/execution` (Action)
+*   **Interface**: `SubmitOrder`, `CancelOrder`.
+*   **MockExecution**: MVP 단계에서의 안전한 테스트 실행기.
 
 ---
 
@@ -71,22 +81,17 @@ graph LR
 
 ### 요구 사항
 *   Go 1.21 이상
-*   Windows / Linux / macOS
 
-### 실행 방법
+### 실행 및 테스트
 ```bash
 # 1. 의존성 설치
 go mod tidy
 
-# 2. 실행 (기본 SMA 전략 탑재됨)
-go run cmd/app/main.go
-# -> 로그에서 "Sequencer started" 및 "STRATEGY_ACTION" 확인 가능
-```
-
-### 테스트 실행
-```bash
-# 전체 유닛 테스트 (Race Detector 포함 권장)
+# 2. 유닛 테스트 (전체 검증)
 go test -v -race ./...
+
+# 3. 실행 (향후 메인 루프 구현 예정)
+go run cmd/app/main.go
 ```
 
 ---
