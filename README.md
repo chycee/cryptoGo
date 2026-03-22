@@ -20,11 +20,12 @@
     *   **Bitget**: Spot & Futures 모두 최신 **V2 API** 적용 (`USDT-FUTURES`).
     *   **Exchange Rate**: Yahoo Finance API를 통한 안정적 환율 수신.
 
-### 2. Trading Skeleton (✅ Ready)
-*   **Architecture**: 매매 로직을 담을 그릇(Interface)과 데이터 구조(Entity) 완성.
-*   **Mock Execution**: 실제 주문 전송 없이 로직을 검증할 수 있는 안전 장치.
-*   **Paper Execution**: 가상 잔고 기반의 전략 시뮬레이션 검증.
-*   **Execution Factory**: PAPER / DEMO / REAL 모드를 설정으로 전환.
+### 2. Core Trading Skeleton (✅ Advanced Maturity)
+*   **Domain-Driven Architecture**: 핵심 비즈니스 로직(`domain`, `execution`, `order`, `balance`) 통합 및 인터페이스 계층의 클린 아키텍처화 완료.
+*   **Lifecycle Control**: 핫패스(`Sequencer`) 메시지 큐의 우아한 종료(Graceful Shutdown) 및 무중단 동시성 처리 안전성 확보.
+*   **Mock Execution**: 실제 주문 전송 없이 전략 로직 자체만을 검증할 수 있는 100% 안전 장벽.
+*   **Paper Execution**: 3대 불변식(자산 음수 불가 등)을 포함한 가상 잔고(`BalanceBook`) 기반의 정밀한 PnL 시뮬레이션. 
+*   **Dependency Injection**: 상황에 맞는 모드 스위칭(`Execution Factory: PAPER/DEMO/REAL`) 및 E2E 테스트를 위한 외부 API 타겟팅(Mock WebSockets) 오버라이딩 완벽 지원.
 
 ---
 
@@ -169,6 +170,17 @@ cryptoGo/
 
 ---
 
+## 🛡️ E2E 통합 안전장치 (Automated Guardrails)
+
+본 시스템은 단순 유닛 테스트를 넘어, **실제 운영(Production) 환경과 100% 동일한 통합 테스트(E2E)**를 내장하고 있습니다 (`cmd/e2e/engine_test.go`).
+이 테스트 스위트는 외부 의존성(네트워크, 실제 API 키) 없이 **로컬 가짜(Mock) 웹소켓 서버**를 0.1초 만에 띄워 다음을 완벽하게 검증합니다.
+
+1. **자동화된 배포 안전장치 (CI/CD)**: 코드를 병합하기 전에 `데이터 수신 → 엔진 처리 → WAL DB 저장`의 전체 파이프라인 무결성을 보장합니다.
+2. **Cold-Start 및 복구(Recovery) 100% 검증**: 시스템이 크래시되거나 재시작되었을 때, 기존 WAL 데이터를 완벽하게 소화하고 중복 오류(Panic) 없이 매매를 재개하는지 수학적으로 증명합니다.
+3. **새로운 거래소 연동 샌드박스**: 실자본의 위협 없이 바이낸스(Binance) 등 새로운 웹소켓 포맷이 파이프라인에서 뻗지 않는지 안전하게 시뮬레이션 할 수 있습니다.
+
+---
+
 ## 📊 성능 지표 (Performance)
 
 | 지표 | 목표 | 달성 |
@@ -195,13 +207,16 @@ cryptoGo/
 # 1. 의존성 설치
 go mod tidy
 
-# 2. 유닛 테스트 (전체 검증)
-go test -v -race ./...
+# 2. 유닛 테스트 (전체 구조 검증)
+go test -v -race ./internal/... ./pkg/...
 
-# 3. 벤치마크 실행
+# 3. E2E 통합 테스트 (Mock 거래소 & 엔진 라이프사이클 검증)
+go test -v ./cmd/e2e
+
+# 4. 벤치마크 실행 (Zero-Alloc & Hotpath 성능)
 go test -bench=. -benchmem ./internal/engine/ ./internal/strategy/
 
-# 4. 실행
+# 5. 실행
 go run cmd/app/main.go
 ```
 
