@@ -72,7 +72,8 @@ graph LR
 cryptoGo/
 ├── cmd/                          # 진입점
 │   ├── app/main.go              # 메인 애플리케이션
-│   ├── integration/main.go      # 통합 테스트 실행기
+│   ├── e2e/engine_test.go       # E2E 통합 테스트 스위트
+│   ├── integration/main.go      # 외부 API 통합 테스트
 │   └── pricetest/main.go        # 가격 테스트 실행기
 ├── internal/                     # 핵심 비즈니스 로직
 │   ├── app/                     # 부트스트랩 (초기화 시퀀스)
