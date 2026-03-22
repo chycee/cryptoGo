@@ -141,7 +141,11 @@ func (s *Sequencer) Run(ctx context.Context) {
 		case <-ctx.Done():
 			slog.Info("Sequencer stopping...")
 			return
-		case ev := <-s.inbox:
+		case ev, ok := <-s.inbox:
+			if !ok {
+				slog.Info("Sequencer inbox closed, stopping gracefully...")
+				return
+			}
 			s.processEvent(ev)
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -52,7 +53,12 @@ func NewWorker(symbols []string, inbox chan<- event.Event, seq *uint64) *Worker 
 func (w *Worker) ID() string { return "UPBIT" }
 
 // GetURL returns the Upbit WebSocket endpoint.
-func (w *Worker) GetURL() string { return wsURL }
+func (w *Worker) GetURL() string {
+	if override := os.Getenv("TEST_UPBIT_WS_URL"); override != "" {
+		return override
+	}
+	return wsURL
+}
 
 // Connect starts the WebSocket connection.
 func (w *Worker) Connect(ctx context.Context) error {
