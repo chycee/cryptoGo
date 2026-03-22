@@ -9,7 +9,7 @@ type AlertConfig struct {
 	Direction         string            `json:"direction"` // "UP" or "DOWN"
 	Exchange          string            `json:"exchange"`  // "UPBIT", "BITGET_F"
 	IsPersistent      bool              `json:"is_persistent"`
-	active            bool
+	Active            bool              `json:"active"`
 }
 
 // NewAlertConfig creates a new alert configuration.
@@ -24,23 +24,23 @@ func NewAlertConfig(symbol string, targetPriceMicros, currentPriceMicros quant.P
 		Direction:         direction,
 		Exchange:          exchange,
 		IsPersistent:      isPersistent,
-		active:            true,
+		Active:            true,
 	}
 }
 
 // IsActive returns whether the alert is active
 func (a *AlertConfig) IsActive() bool {
-	return a.active
+	return a.Active
 }
 
 // SetActive sets the alert's active state
 func (a *AlertConfig) SetActive(active bool) {
-	a.active = active
+	a.Active = active
 }
 
 // CheckCondition checks if alert condition is met.
 func (a *AlertConfig) CheckCondition(currentPriceMicros quant.PriceMicros) bool {
-	if !a.active {
+	if !a.Active {
 		return false
 	}
 	switch a.Direction {

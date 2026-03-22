@@ -2,6 +2,7 @@ package quant
 
 import (
 	"fmt"
+	"log/slog"
 	"math"
 	"strconv"
 	"strings"
@@ -89,7 +90,11 @@ func parseFixedPoint(s string, precision int) int64 {
 	}
 
 	// 1. Parse Integer Part
-	intPart, _ := strconv.ParseInt(parts[0], 10, 64)
+	intPart, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil && parts[0] != "" && parts[0] != "-" {
+		slog.Warn("parseFixedPoint: invalid integer part", "input", s, "error", err)
+		return 0
+	}
 	for i := 0; i < precision; i++ {
 		intPart *= 10
 	}
@@ -103,7 +108,11 @@ func parseFixedPoint(s string, precision int) int64 {
 	if len(fracStr) > precision {
 		fracStr = fracStr[:precision]
 	}
-	fracPart, _ := strconv.ParseInt(fracStr, 10, 64)
+	fracPart, err2 := strconv.ParseInt(fracStr, 10, 64)
+	if err2 != nil {
+		slog.Warn("parseFixedPoint: invalid fraction part", "input", s, "error", err2)
+		return intPart
+	}
 
 	// Pad fraction part with zeros if shorter than precision
 	for i := len(fracStr); i < precision; i++ {

@@ -3,6 +3,7 @@ package bitget
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"crypto_go/internal/event"
 	"crypto_go/internal/infra"
@@ -49,7 +50,10 @@ func (w *FuturesWorker) OnConnect(ctx context.Context, conn *websocket.Conn) err
 		args = append(args, subscribeArg{InstType: "USDT-FUTURES", Channel: "ticker", InstId: id})
 	}
 	req := subscribeRequest{Op: "subscribe", Args: args}
-	b, _ := json.Marshal(req)
+	b, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal subscribe request: %w", err)
+	}
 	return w.base.Write(websocket.TextMessage, b)
 }
 

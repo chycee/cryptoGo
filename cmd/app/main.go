@@ -56,6 +56,12 @@ func main() {
 		// slog.Info("State changed", slog.String("symbol", state.Symbol), slog.String("price", state.PriceMicros.String()))
 	})
 
+	// Recover sequence and state from the WAL
+	if err := seq.RecoverFromWAL(ctx); err != nil {
+		slog.Error("❌ Failed to recover from WAL", slog.Any("error", err))
+		os.Exit(1)
+	}
+
 	// Start Sequencer in its own goroutine (The Hotpath Loop)
 	go seq.Run(ctx)
 	slog.InfoContext(ctx, "✅ Sequencer (Hotpath) started")
@@ -63,8 +69,12 @@ func main() {
 	cfg := bootstrap.Config
 	nextSeq := uint64(1)
 
-	// Exchange Rate Client (Gateway) - Still in infra root for common utility
-	exchangeRateClient := infra.NewExchangeRateClient(seq.Inbox(), &nextSeq)
+	// Exchange Rate Client (Gateway) - Uses config for URL and poll interval
+	exchangeRateClient := infra.NewExchangeRateClientWithConfig(
+		seq.Inbox(), &nextSeq,
+		cfg.API.ExchangeRate.URL,
+		cfg.API.ExchangeRate.PollIntervalSec,
+	)
 	if err := exchangeRateClient.Start(ctx); err != nil {
 		slog.Error("Failed to start exchange rate client", slog.Any("error", err))
 	}

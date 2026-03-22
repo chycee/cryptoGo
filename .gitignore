@@ -14,12 +14,14 @@ bin/
 # OS files
 # Binaries
 cryptomonitor
+main
 bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+panic_dump.json
 
 # Configuration (Secrets)
 # configs/config.yaml is tracked for deployment ease.

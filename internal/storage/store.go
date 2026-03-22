@@ -36,7 +36,7 @@ func NewEventStore(dbPath string) (*EventStore, error) {
 		}
 	}
 
-	// Create metadata table for KV storage (GORM replacement)
+	// Create metadata table for KV storage
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS metadata (
 			key TEXT PRIMARY KEY,
@@ -49,7 +49,6 @@ func NewEventStore(dbPath string) (*EventStore, error) {
 	}
 
 	// Create events table for WAL-first event logging
-	// version column is for future Optimistic Lock support (multi-writer)
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS events (
 			id INTEGER PRIMARY KEY,
@@ -118,8 +117,8 @@ func (s *EventStore) GetLastSeq(ctx context.Context) (uint64, error) {
 }
 
 // LoadEvents loads all events from WAL starting from fromSeq (inclusive).
-// Used for Replay Engine to reconstruct state.
-func (s *EventStore) LoadEvents(ctx context.Context, fromSeq uint64) ([]*event.MarketUpdateEvent, error) {
+// Returns all event types as []event.Event for complete WAL replay.
+func (s *EventStore) LoadEvents(ctx context.Context, fromSeq uint64) ([]event.Event, error) {
 	rows, err := s.db.QueryContext(ctx,
 		"SELECT id, type, ts, payload FROM events WHERE id >= ? ORDER BY id ASC",
 		fromSeq,
@@ -129,7 +128,7 @@ func (s *EventStore) LoadEvents(ctx context.Context, fromSeq uint64) ([]*event.M
 	}
 	defer rows.Close()
 
-	var events []*event.MarketUpdateEvent
+	var events []event.Event
 	for rows.Next() {
 		var id int64
 		var evType int
@@ -140,13 +139,22 @@ func (s *EventStore) LoadEvents(ctx context.Context, fromSeq uint64) ([]*event.M
 			return nil, fmt.Errorf("failed to scan event: %w", err)
 		}
 
-		// Currently only supporting MarketUpdateEvent for replay
-		if event.Type(evType) == event.EvMarketUpdate {
+		switch event.Type(evType) {
+		case event.EvMarketUpdate:
 			var ev event.MarketUpdateEvent
 			if err := json.Unmarshal(payload, &ev); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal event %d: %w", id, err)
 			}
 			events = append(events, &ev)
+		case event.EvOrderUpdate:
+			var ev event.OrderUpdateEvent
+			if err := json.Unmarshal(payload, &ev); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal event %d: %w", id, err)
+			}
+			events = append(events, &ev)
+		default:
+			// Skip unknown event types
+			continue
 		}
 	}
 
@@ -160,4 +168,9 @@ func (s *EventStore) LoadEvents(ctx context.Context, fromSeq uint64) ([]*event.M
 // Close closes the database connection.
 func (s *EventStore) Close() error {
 	return s.db.Close()
+}
+
+// DB returns the underlying database connection for direct access.
+func (s *EventStore) DB() *sql.DB {
+	return s.db
 }

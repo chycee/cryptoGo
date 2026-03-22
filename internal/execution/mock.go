@@ -8,6 +8,7 @@ import (
 )
 
 // MockExecution is a safe implementation that only logs orders.
+// Implements domain.Execution interface.
 type MockExecution struct {
 	// Can add channels here to capture orders for testing if needed
 }
@@ -16,8 +17,8 @@ func NewMockExecution() *MockExecution {
 	return &MockExecution{}
 }
 
-func (m *MockExecution) SubmitOrder(ctx context.Context, order domain.Order) error {
-	slog.Info("MOCK EXECUTION: Submit Order",
+func (m *MockExecution) ExecuteOrder(ctx context.Context, order domain.Order) error {
+	slog.Info("MOCK EXECUTION: Execute Order",
 		slog.String("id", order.ID),
 		slog.String("symbol", order.Symbol),
 		slog.String("side", order.Side),
@@ -27,7 +28,11 @@ func (m *MockExecution) SubmitOrder(ctx context.Context, order domain.Order) err
 	return nil
 }
 
-func (m *MockExecution) CancelOrder(ctx context.Context, orderID string) error {
-	slog.Info("MOCK EXECUTION: Cancel Order", slog.String("id", orderID))
+func (m *MockExecution) CancelOrder(ctx context.Context, orderID string, symbol string) error {
+	slog.Info("MOCK EXECUTION: Cancel Order", slog.String("id", orderID), slog.String("symbol", symbol))
+	return nil
+}
+
+func (m *MockExecution) Close() error {
 	return nil
 }

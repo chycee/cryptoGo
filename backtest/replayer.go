@@ -5,7 +5,6 @@ import (
 	"crypto_go/internal/engine"
 	"crypto_go/internal/event"
 	"crypto_go/internal/storage"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -14,30 +13,52 @@ import (
 // Replayer reads event logs from SQLite and feeds them into the Sequencer.
 type Replayer struct {
 	store *storage.EventStore
-	db    *sql.DB // Direct DB access for reading logs
 }
 
 // NewReplayer creates a new replayer instance.
 func NewReplayer(dbPath string) (*Replayer, error) {
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, err
-	}
-
 	store, err := storage.NewEventStore(dbPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open replay DB: %w", err)
 	}
 
 	return &Replayer{
 		store: store,
-		db:    db,
 	}, nil
+}
+
+// Close releases database resources.
+func (r *Replayer) Close() error {
+	if r.store != nil {
+		return r.store.Close()
+	}
+	return nil
 }
 
 // RunReplay replays all events into the provided sequencer.
 func (r *Replayer) RunReplay(ctx context.Context, seq *engine.Sequencer) error {
-	rows, err := r.db.QueryContext(ctx, "SELECT id, type, payload FROM events ORDER BY id ASC")
+	events, err := r.store.LoadEvents(ctx, 1)
+	if err != nil {
+		return fmt.Errorf("failed to load events: %w", err)
+	}
+
+	slog.Info("Starting replay", slog.Int("event_count", len(events)))
+
+	for _, ev := range events {
+		seq.ReplayEvent(ev)
+	}
+
+	return nil
+}
+
+// RunReplayRaw replays events using raw DB query for custom event type handling.
+func (r *Replayer) RunReplayRaw(ctx context.Context, seq *engine.Sequencer) error {
+	db := r.store.DB()
+	if db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	rows, err := db.QueryContext(ctx, "SELECT id, type, payload FROM events ORDER BY id ASC")
 	if err != nil {
 		return fmt.Errorf("failed to query events: %w", err)
 	}

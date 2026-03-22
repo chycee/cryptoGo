@@ -150,6 +150,9 @@ func (s *Sequencer) Run(ctx context.Context) {
 // ReplayEvent processes an event synchronously without WAL logging.
 // This is used exclusively by the Replayer.
 func (s *Sequencer) ReplayEvent(ev event.Event) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if ev.GetSeq() != s.nextSeq {
 		panic(fmt.Sprintf("REPLAY_GAP_DETECTED: expected %d, got %d", s.nextSeq, ev.GetSeq()))
 	}
@@ -165,8 +168,18 @@ func (s *Sequencer) ReplayEvent(ev event.Event) {
 }
 
 func (s *Sequencer) processEvent(ev event.Event) {
-	// 1. Sequence Gap Check (Halt Policy)
-	s.ValidateSequence(ev.GetSeq())
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 1. Assign sequence number (Sequencer is the single source of truth for ordering)
+	// Worker-assigned seqs are ignored; the Sequencer stamps its own monotonic seq.
+	assignedSeq := s.nextSeq
+	switch e := ev.(type) {
+	case *event.MarketUpdateEvent:
+		e.Seq = assignedSeq
+	case *event.OrderUpdateEvent:
+		e.Seq = assignedSeq
+	}
 
 	// 2. WAL-first: Persistence
 	if s.store != nil {
@@ -179,11 +192,14 @@ func (s *Sequencer) processEvent(ev event.Event) {
 	switch e := ev.(type) {
 	case *event.MarketUpdateEvent:
 		s.handleMarketUpdate(e)
+		// 4. Release event back to pool after processing (Rule #3: Zero-Alloc)
+		event.ReleaseMarketUpdateEvent(e)
 	case *event.OrderUpdateEvent:
-		// Pending
+		// Pending — release when OrderUpdateEvent handling is implemented
+		event.ReleaseOrderUpdateEvent(e)
 	}
 
-	// 4. Increment Sequence
+	// 5. Increment Sequence
 	s.nextSeq++
 }
 
@@ -241,8 +257,16 @@ func (s *Sequencer) GetMarketState(symbol string) (domain.MarketState, bool) {
 func (s *Sequencer) DumpState(filename string) {
 	slog.Info("Dumping internal state...", slog.String("file", filename))
 
-	// Rule #8: Verify balance invariants before dump (may panic if corrupted)
-	s.balanceBook.VerifyAll()
+	// Rule #8: Try to verify balance invariants, but don't let verification
+	// panic abort the dump (prevents double-panic in crash handler)
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("Balance invariant check failed during dump", slog.Any("error", r))
+			}
+		}()
+		s.balanceBook.VerifyAll()
+	}()
 
 	data := struct {
 		NextSeq  uint64                         `json:"next_seq"`

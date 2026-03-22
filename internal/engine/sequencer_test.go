@@ -15,71 +15,68 @@ func TestSequencer_MarketUpdate(t *testing.T) {
 
 	go seq.Run(ctx)
 
+	// Store expected values before sending (event is released to pool after processing)
+	expectedPrice := quant.PriceMicros(100000000)
+	expectedSymbol := "BTC-KRW"
+
 	// Send an event
 	ev := &event.MarketUpdateEvent{
-		BaseEvent:   event.BaseEvent{Seq: 1, Ts: 1000},
-		Symbol:      "BTC-KRW",
-		PriceMicros: quant.PriceMicros(100000000), // 100 BTC
-		QtySats:     quant.QtySats(100000000),     // 1 BTC
+		BaseEvent:   event.BaseEvent{Seq: 0, Ts: 1000}, // Seq is overwritten by Sequencer
+		Symbol:      expectedSymbol,
+		PriceMicros: expectedPrice,
+		QtySats:     quant.QtySats(100000000),
 	}
 	seq.Inbox() <- ev
 
 	// Wait for processing
 	time.Sleep(100 * time.Millisecond)
 
-	state, ok := seq.GetMarketState("BTC-KRW")
+	state, ok := seq.GetMarketState(expectedSymbol)
 	if !ok {
 		t.Fatal("Market state should exist")
 	}
-	if state.PriceMicros != ev.PriceMicros {
-		t.Errorf("Expected price %d, got %d", ev.PriceMicros, state.PriceMicros)
+	if state.PriceMicros != expectedPrice {
+		t.Errorf("Expected price %d, got %d", expectedPrice, state.PriceMicros)
 	}
 }
 
-func TestSequencer_GapTolerance(t *testing.T) {
-	// 1. Setup
+func TestSequencer_SeqAssignment(t *testing.T) {
+	// Verify that Sequencer assigns monotonic seq numbers to events
 	seq := NewSequencer(10, nil, nil, nil)
-	// Default nextSeq is 1.
 
-	// 2. Send Event with Seq 2 (Gap = 1) -> Should be TOLERATED (No Panic)
-	ev := &event.MarketUpdateEvent{
-		BaseEvent: event.BaseEvent{Seq: 2, Ts: 1000},
+	ev1 := &event.MarketUpdateEvent{
+		BaseEvent: event.BaseEvent{Seq: 999, Ts: 1000}, // Worker seq is irrelevant
 		Symbol:    "BTC-KRW",
 	}
-	
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				t.Errorf("Sequencer panicked on small gap (<=10): %v", r)
-			}
-		}()
-		seq.processEvent(ev)
-	}()
+	ev2 := &event.MarketUpdateEvent{
+		BaseEvent: event.BaseEvent{Seq: 500, Ts: 2000}, // Worker seq is irrelevant
+		Symbol:    "ETH-KRW",
+	}
 
-	// 3. Verify sequence advanced
-	// After gap tolerance, nextSeq should be updated to ev.Seq + 1 (next expected)
-	// WAIT. Logic says: s.nextSeq = evSeq (fast forward) -> then it increments at end of processEvent.
-	// So nextSeq should be 3.
-	// Let's check internal state if we could, but nextSeq is private.
-	// We rely on "No Panic" as primary success criteria here.
+	seq.ProcessEventForTest(ev1)
+	seq.ProcessEventForTest(ev2)
+
+	// After processing 2 events starting from seq=1, nextSeq should be 3
+	nextSeq := seq.GetNextSeq()
+	if nextSeq != 3 {
+		t.Errorf("Expected nextSeq 3, got %d", nextSeq)
+	}
 }
 
-func TestSequencer_GapPanic(t *testing.T) {
-	// 1. Setup
+func TestSequencer_ReplayGapPanic(t *testing.T) {
+	// ReplayEvent still validates seq strictly (WAL events have Sequencer-assigned seqs)
 	seq := NewSequencer(10, nil, nil, nil)
-	// Default nextSeq is 1.
 
-	// 2. Send Event with Seq 20 (Gap = 19) -> Should PANIC
 	ev := &event.MarketUpdateEvent{
-		BaseEvent: event.BaseEvent{Seq: 20, Ts: 1000},
+		BaseEvent: event.BaseEvent{Seq: 5, Ts: 1000}, // Expected seq=1, got=5
 		Symbol:    "BTC-KRW",
 	}
 
 	defer func() {
 		if r := recover(); r == nil {
-			t.Error("Sequencer should have panicked on large gap (>10)")
+			t.Error("ReplayEvent should have panicked on seq gap")
 		}
 	}()
-	
-	seq.processEvent(ev)
+
+	seq.ReplayEvent(ev)
 }

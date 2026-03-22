@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"syscall"
 )
 
 const (
@@ -57,32 +58,45 @@ func EnsureDir(path string) error {
 	return os.MkdirAll(path, 0755)
 }
 
-// CreateLockFile attempts to create and lock a file to prevent multiple instances.
-// It returns a closer function and an error if another instance is already running.
+// CreateLockFile attempts to lock a file to prevent multiple instances.
+// Uses OS-level flock which auto-releases when process exits (even on crash).
 func CreateLockFile(workDir string) (func(), error) {
 	lockPath := filepath.Join(workDir, "instance.lock")
 
-	// On Windows, os.OpenFile with specific flags can act as a lock.
-	// On Linux, we just check if it exists or use more complex flock (omitted for pure Go simplicity).
-	// A simpler "Fail Fast" approach: Try to create, if exists, fail.
-
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if err != nil {
-		if os.IsExist(err) {
-			return nil, fmt.Errorf("another instance is already running (lock file exists: %s)", lockPath)
-		}
+	// Ensure parent dir exists
+	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return nil, err
 	}
 
-	// Write current PID for debugging
-	f.WriteString(fmt.Sprintf("%d", os.Getpid()))
-	f.Close()
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, err
+	}
 
+	// Try non-blocking exclusive lock
+	if err := lockFile(f); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("another instance is already running (lock: %s)", lockPath)
+	}
+
+	// Write current PID for debugging
+	f.Truncate(0)
+	f.Seek(0, 0)
+	f.WriteString(fmt.Sprintf("%d", os.Getpid()))
+
+	// Keep file open — lock is held as long as the file descriptor is open
 	closer := func() {
+		f.Close()
 		os.Remove(lockPath)
 	}
 
 	return closer, nil
+}
+
+// lockFile attempts to acquire an exclusive, non-blocking lock on the given file.
+// It uses syscall.Flock for OS-level file locking.
+func lockFile(f *os.File) error {
+	return syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 }
 
 // ResolveConfigPath attempts to find the config.yaml.

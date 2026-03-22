@@ -76,7 +76,10 @@ func (w *Worker) OnConnect(ctx context.Context, conn *websocket.Conn) error {
 		{"ticket": fmt.Sprintf("go-%d", time.Now().UnixNano())},
 		{"type": "ticker", "codes": codes},
 	}
-	b, _ := json.Marshal(msg)
+	b, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal subscribe message: %w", err)
+	}
 	return w.base.Write(websocket.TextMessage, b)
 }
 

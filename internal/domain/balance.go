@@ -117,7 +117,7 @@ func (bb *BalanceBook) Snapshot() map[string]Balance {
 
 // CalculateTotalEquity computes the total value of the portfolio in the quote currency (e.g., KRW/USDT).
 // prices: map of symbol -> current price (PriceMicros).
-// returns: Total Equity (int64).
+// returns: Total Equity in PriceMicros (int64).
 func (bb *BalanceBook) CalculateTotalEquity(prices map[string]int64) int64 {
 	var totalEquity int64 = 0
 
@@ -125,14 +125,18 @@ func (bb *BalanceBook) CalculateTotalEquity(prices map[string]int64) int64 {
 		// 1. Get Price
 		price, ok := prices[symbol]
 		if !ok {
-			// If price missing, assume 0 or log warning?
-			// For safety (conservative), we skip value calculation for unknown assets.
 			continue
 		}
 
-		// 2. Calculate Asset Value: (Amount + Reserved) * Price
-		// Note: AmountSats is the TOTAL.
-		assetValue := safe.SafeMul(balance.AmountSats, price)
+		// 2. Calculate Asset Value: AmountSats * Price / QtyScale
+		// Divide first to prevent overflow (AmountSats * PriceMicros can exceed int64)
+		// Trade-off: loses sub-satoshi precision but prevents panic
+		wholeUnits := safe.SafeDiv(balance.AmountSats, 100_000_000) // Sats -> whole units
+		remainder := balance.AmountSats % 100_000_000
+		assetValue := safe.SafeMul(wholeUnits, price)
+		// Add fractional part: remainder * price / QtyScale
+		fracValue := safe.SafeDiv(safe.SafeMul(remainder, price), 100_000_000)
+		assetValue = safe.SafeAdd(assetValue, fracValue)
 
 		// 3. Accumulate
 		totalEquity = safe.SafeAdd(totalEquity, assetValue)

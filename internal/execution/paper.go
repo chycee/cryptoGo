@@ -7,6 +7,7 @@ import (
 	"crypto_go/pkg/safe"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 )
@@ -84,8 +85,12 @@ func (p *PaperExecution) ExecuteOrder(ctx context.Context, order domain.Order) e
 	// Calculate required amount
 	// BUY: need quote currency (e.g., USDT)
 	// SELL: need base currency (e.g., BTC)
-	baseSymbol := order.Symbol[:3]  // e.g., "BTC" from "BTCUSDT"
-	quoteSymbol := order.Symbol[3:] // e.g., "USDT" from "BTCUSDT"
+	parts := strings.SplitN(order.Symbol, "-", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid symbol format (expected BASE-QUOTE): %s", order.Symbol)
+	}
+	baseSymbol := parts[0]  // e.g., "BTC" from "BTC-USDT"
+	quoteSymbol := parts[1] // e.g., "USDT" from "BTC-USDT"
 
 	if order.Side == "BUY" {
 		// Need quote currency: price * qty

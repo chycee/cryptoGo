@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"crypto_go/internal/domain"
@@ -83,12 +84,9 @@ func (c *Client) PlaceOrder(ctx context.Context, order domain.Order) error {
 	// Rate Limiting: Prevent IP ban (보안 강화)
 	infra.GetBitgetOrderLimiter().Wait()
 
-	// 1. Boundary Conversion
-	priceStr := fmt.Sprintf("%d.%06d", order.PriceMicros/1_000_000, order.PriceMicros%1_000_000)
-	// V2 Futures Size: Usually in "Base Coin" or "Contracts"?
-	// Bitget V2 Mix: "size" is amount in BASE coin for USDT-FUTURES (e.g. 0.1 BTC).
-	// QtySats (8 decimals) -> String
-	sizeStr := fmt.Sprintf("%d.%08d", order.QtySats/100_000_000, order.QtySats%100_000_000)
+	// 1. Boundary Conversion (handles negative values correctly)
+	priceStr := formatFixedPoint(order.PriceMicros, 6)
+	sizeStr := formatFixedPoint(order.QtySats, 8)
 
 	side := "buy"
 	if order.Side == domain.SideSell {
@@ -250,8 +248,14 @@ func (c *Client) doRequest(ctx context.Context, method, path string, payload int
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	// 1. Generate Auth Headers
-	headers := c.signer.GenerateHeaders(method, path, "", bodyStr)
+	// 1. Generate Auth Headers — split path and query for proper signature
+	signPath := path
+	signQuery := ""
+	if idx := strings.IndexByte(path, '?'); idx != -1 {
+		signPath = path[:idx]
+		signQuery = path[idx:] // includes '?'
+	}
+	headers := c.signer.GenerateHeaders(method, signPath, signQuery, bodyStr)
 	for k, v := range headers {
 		req.Header[k] = []string{v}
 	}
@@ -274,4 +278,22 @@ func (c *Client) doRequest(ctx context.Context, method, path string, payload int
 	// Record success for successful HTTP response (even 4xx is "server responded")
 	c.circuitBreaker.RecordSuccess()
 	return resp, nil
+}
+
+// formatFixedPoint converts an int64 to a decimal string with the given precision.
+// Correctly handles negative values (e.g., -1234567 with precision 6 -> "-1.234567").
+func formatFixedPoint(value int64, precision int) string {
+	scale := int64(1)
+	for i := 0; i < precision; i++ {
+		scale *= 10
+	}
+
+	sign := ""
+	if value < 0 {
+		sign = "-"
+		value = -value
+	}
+	whole := value / scale
+	frac := value % scale
+	return fmt.Sprintf("%s%d.%0*d", sign, whole, precision, frac)
 }

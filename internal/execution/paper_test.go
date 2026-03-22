@@ -11,12 +11,12 @@ func TestPaperExecution_Buy(t *testing.T) {
 
 	// Setup: deposit 10000 USDT
 	paper.Deposit("USDT", 10000_000000)        // 10000 USDT in Sats
-	paper.UpdatePrice("BTCUSDT", 50000_000000) // 50000 USDT/BTC
+	paper.UpdatePrice("BTC-USDT", 50000_000000) // 50000 USDT/BTC
 
 	// Buy 0.1 BTC
 	order := domain.Order{
 		ID:      "order-1",
-		Symbol:  "BTCUSDT",
+		Symbol:  "BTC-USDT",
 		Side:    "BUY",
 		Type:    "MARKET",
 		QtySats: 10_000000, // 0.1 BTC in Sats
@@ -56,12 +56,12 @@ func TestPaperExecution_Sell(t *testing.T) {
 
 	// Setup: deposit 1 BTC
 	paper.Deposit("BTC", 100_000000)           // 1 BTC in Sats
-	paper.UpdatePrice("BTCUSDT", 50000_000000) // 50000 USDT/BTC
+	paper.UpdatePrice("BTC-USDT", 50000_000000) // 50000 USDT/BTC
 
 	// Sell 0.5 BTC
 	order := domain.Order{
 		ID:      "order-2",
-		Symbol:  "BTCUSDT",
+		Symbol:  "BTC-USDT",
 		Side:    "SELL",
 		Type:    "MARKET",
 		QtySats: 50_000000, // 0.5 BTC in Sats
@@ -91,12 +91,12 @@ func TestPaperExecution_InsufficientBalance(t *testing.T) {
 
 	// Setup: deposit only 100 USDT
 	paper.Deposit("USDT", 100_000000)
-	paper.UpdatePrice("BTCUSDT", 50000_000000)
+	paper.UpdatePrice("BTC-USDT", 50000_000000)
 
 	// Try to buy 1 BTC (need 50000 USDT)
 	order := domain.Order{
 		ID:      "order-3",
-		Symbol:  "BTCUSDT",
+		Symbol:  "BTC-USDT",
 		Side:    "BUY",
 		Type:    "MARKET",
 		QtySats: 100_000000, // 1 BTC

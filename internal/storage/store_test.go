@@ -61,8 +61,12 @@ func TestEventStore_SaveAndLoad(t *testing.T) {
 	if loaded[0].GetSeq() != 1 {
 		t.Errorf("Event 1 seq mismatch: got %d", loaded[0].GetSeq())
 	}
-	if loaded[0].PriceMicros != 50000000000 {
-		t.Errorf("Event 1 price mismatch: got %d", loaded[0].PriceMicros)
+	mev, ok := loaded[0].(*event.MarketUpdateEvent)
+	if !ok {
+		t.Fatal("Event 1 should be MarketUpdateEvent")
+	}
+	if mev.PriceMicros != 50000000000 {
+		t.Errorf("Event 1 price mismatch: got %d", mev.PriceMicros)
 	}
 
 	// Verify second event

@@ -10,7 +10,6 @@ import (
 type ExchangeWorker interface {
 	Connect(ctx context.Context) error
 	Disconnect()
-	IsConnected() bool
 }
 
 // ExchangeRateProvider defines the interface for currency exchange rate sources
